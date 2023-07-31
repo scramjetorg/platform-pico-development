@@ -1,5 +1,9 @@
 # Pico development - Getting started
-## System dependencies
+
+## Requirements
+Windows system with WSL2 and VS Code installed.
+
+## Linux system dependencies
 
 ```
 # sudo apt install --no-install-recommends git cmake ninja-build gperf \
@@ -32,25 +36,22 @@ Download SDK
 # git clone https://github.com/Nukersson/zephyr_vscode_workspace.git
 ```
 
-## Picoprobe USB device passthrough to WSL
+## Pico and Picoprobe USB device passthrough to WSL
 ###  On Windows
+Bind usb ports:
 
-Install USBIPd, windows software for sharing locally connected USB devices to other machines, including Hyper-V guests and WSL 2.
-https://github.com/dorssel/usbipd-win/
+Install [USBIPd](https://github.com/dorssel/usbipd-win/), windows software for sharing locally connected USB devices to other machines, including Hyper-V guests and WSL2. 
 
+- Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
+- Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
 
-Pico probe is reported by system as device with hardware ID `2e8a:000a` and `2e8a:000c`.
 ```
 # usbipd bind --force --hardware-id 2e8a:000a
-# usbipd wsl attach --hardware-id 2e8a:000a
-```
-
-```
 # usbipd bind --force --hardware-id 2e8a:000c
-# usbipd wsl attach --hardware-id 2e8a:000c
 ```
 
 ### On Ubuntu
+Install required packages
 ```
 # sudo apt install linux-tools-generic hwdata
 # sudo update-alternatives --install /usr/local/bin/usbip usbip /usr/lib/linux-tools/*-generic/usbip 20
@@ -64,7 +65,16 @@ Bus 001 Device 002: ID 2e8a:000c Raspberry Pi Debug Probe (CMSIS-DAP)
 (...)
 ```
 
-# OpenOCD
+###  On Windows
+Attach ports to WSL:
+
+```
+# usbipd wsl attach --hardware-id 2e8a:000a
+# usbipd wsl attach --hardware-id 2e8a:000c
+```
+
+
+# Install OpenOCD
 
 ```
 # sudo apt install automake autoconf build-essential texinfo libtool libftdi-dev libusb-1.0-0-dev
@@ -85,7 +95,7 @@ Configure udev
 ```
 
 
-Test it, run in console:
+Test it (debug probe must be connected to your pico debug pins), run in console:
 ```
 # openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg
 ```
@@ -112,9 +122,22 @@ Info : [rp2040.core0] Cortex-M0+ r0p1 processor detected
 Info : Listening on port 3333 for gdb connections
 ```
 
+# Download Scramjet repository
+
+```
+# cd ~/workspace
+# git clone git@github.com:scramjetorg/platform-pico-development.git
+
+```
+
 # VS Code configuration files:
 
 ## Zephyr.code-workspace
+
+Change file under path: ~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace
+
+To following:
+
 ```
 {
 	"folders": [
@@ -127,7 +150,7 @@ Info : Listening on port 3333 for gdb connections
 		},
 		{
 			"name": "AppUnderDev",
-			"path": "../zephyr/samples/hello_world"
+			"path": "../../platform-pico-development"
 		},
 		{
 			"name": "ZephyrTests",
@@ -267,6 +290,11 @@ Info : Listening on port 3333 for gdb connections
 ```
 
 # launch.json
+
+Change file under path: ~/workspace/zephyrproject/zephyr_vscode_workspace/.vscode/launch.json
+
+To following:
+
 ```
 {
 	"version": "2.0.0",
@@ -284,7 +312,7 @@ Info : Listening on port 3333 for gdb connections
 		"device": "${config:bsp.soc}",
 		"targetId": "${config:bsp.board}",
 		"boardId": "1",
-		"toolchainPrefix": "/home/rg/workspace/libs/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin/arm-zephyr-eabi",
+		"toolchainPrefix": "${userHome}/workspace/libs/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin/arm-zephyr-eabi",
 		"armToolchainPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}",
 		"svdFile": "${config:bsp.svd}",
 		"showDevDebugOutput": "raw",
@@ -315,6 +343,14 @@ Info : Listening on port 3333 for gdb connections
 	]
 }
 ```
+# Run workspace in VS Code
+
+In VS Code select: File->Open Workspace from File...
+
+Select path: ~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspac
+
+After hitting F5 (or select "Start Debugging") you should be able to flash and debug your Pico.
+
 Sources:
 
 * https://github.com/robotdad/piconotes
