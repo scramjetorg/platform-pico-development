@@ -42,13 +42,14 @@ Bind usb ports:
 
 Install [USBIPd](https://github.com/dorssel/usbipd-win/), windows software for sharing locally connected USB devices to other machines, including Hyper-V guests and WSL2. 
 
-- Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
-- Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
-
 ```
 # usbipd bind --force --hardware-id 2e8a:000a
 # usbipd bind --force --hardware-id 2e8a:000c
 ```
+
+!!! Info
+	- Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
+	- Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
 
 ### On Ubuntu
 Install required packages
@@ -73,6 +74,25 @@ Attach ports to WSL:
 # usbipd wsl attach --hardware-id 2e8a:000c
 ```
 
+
+!!! Tip
+	Attaching is required every time you restart WSL / your computer, I suggest to create a simple Powershell script `AttachDebugger.ps1` with code
+
+	```
+	usbipd wsl attach --hardware-id 2e8a:000a
+	usbipd wsl attach --hardware-id 2e8a:000c
+
+	Write-Host "Press any key to continue..."
+	$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+	```
+
+	to quickly attach devices. "Press any key..." is added due to prevent console window close.
+
+If running scripts is disabled on your Windows open PowerShell as an Administrator (the command will fail otherwise) and run the following command:
+
+```
+Set-ExecutionPolicy RemoteSigned
+```
 
 # Install OpenOCD
 
@@ -127,14 +147,13 @@ Info : Listening on port 3333 for gdb connections
 ```
 # cd ~/workspace
 # git clone git@github.com:scramjetorg/platform-pico-development.git
-
 ```
 
 # VS Code configuration files:
 
 ## Zephyr.code-workspace
 
-Change file under path: ~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace
+Change file under path: `~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace`
 
 To following:
 
@@ -345,11 +364,31 @@ To following:
 ```
 # Run workspace in VS Code
 
-In VS Code select: File->Open Workspace from File...
+In VS Code select: `File`->`Open Workspace from File` and select path: `~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace`
 
-Select path: ~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspac
+Press `Ctrl + Shift + P` and select `Tasks: Run build tasks`
 
-After hitting F5 (or select "Start Debugging") you should be able to flash and debug your Pico.
+Run `West Build app`
+
+You should get something like that:
+
+```
+(...)
+-- west build: building application
+[1/12] Performing build step for 'second_stage_bootloader'
+ninja: no work to do.
+[8/8] Linking C executable zephyr/zephyr.elf
+Memory region         Used Size  Region Size  %age Used
+      BOOT_FLASH:         256 B        256 B    100.00%
+           FLASH:       18797 B    2096896 B      0.90%
+             RAM:        9640 B       264 KB      3.57%
+        IDT_LIST:          0 GB         2 KB      0.00%
+Converting to uf2, output size: 38400, start address: 0x10000000
+Wrote 38400 bytes to zephyr.uf2
+ *  Terminal will be reused by tasks, press any key to close it. 
+ ```
+
+After hitting `F5` (or select `Start Debugging`) you should be able to flash and debug your Pico.
 
 Sources:
 
