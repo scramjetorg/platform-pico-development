@@ -47,9 +47,9 @@ Install [USBIPd](https://github.com/dorssel/usbipd-win/), windows software for s
 # usbipd bind --force --hardware-id 2e8a:000c
 ```
 
-!!! Info
-	- Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
-	- Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
+> [!NOTE]  
+> * Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
+> *  Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
 
 ### On Ubuntu
 Install required packages
@@ -75,24 +75,25 @@ Attach ports to WSL:
 ```
 
 
-!!! Tip
-	Attaching is required every time you restart WSL / your computer, I suggest to create a simple Powershell script `AttachDebugger.ps1` with code
+> [!IMPORTANT]
+>	Attaching is required every time you restart WSL /  your computer, I suggest to create a simple Powershell script `AttachDebugger.ps1` with code:
+>
+>	```
+> 	usbipd wsl attach --hardware-id 2e8a:000a
+>	usbipd wsl attach --hardware-id 2e8a:000c
+>
+>	Write-Host "Press any key to continue..."
+>	$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+>	```
+>
+> 	to quickly attach devices. "Press any key..." is added > due to prevent console window close.
 
-	```
-	usbipd wsl attach --hardware-id 2e8a:000a
-	usbipd wsl attach --hardware-id 2e8a:000c
-
-	Write-Host "Press any key to continue..."
-	$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-	```
-
-	to quickly attach devices. "Press any key..." is added due to prevent console window close.
-
-If running scripts is disabled on your Windows open PowerShell as an Administrator (the command will fail otherwise) and run the following command:
-
-```
-Set-ExecutionPolicy RemoteSigned
-```
+> [!WARNING]  
+>	If running scripts is disabled on your Windows open PowerShell as an Administrator (the command will fail otherwise) and run the following command:
+>
+>	```
+>	Set-ExecutionPolicy RemoteSigned
+>	```
 
 # Install OpenOCD
 
