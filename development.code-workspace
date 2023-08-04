@@ -1,0 +1,141 @@
+{
+	"folders": [
+		{
+			"path": "../"
+		},
+		{
+			"name": "zephyrproject",
+			"path": "../"
+		},
+		{
+			"name": "AppUnderDev",
+			"path": "./"
+		},
+		{
+			"name": "BootloaderUnderDev",
+			"path": "../bootloader/mcuboot/boot/zephyr"
+		}
+	],
+
+	"settings": {
+		"west": "west",
+
+		// Board support package settings:
+		"bsp": {
+			"cpu": "",
+			"soc": "RP2040",
+			"board": "rpi_pico",
+			"board_root": "${workspaceFolder:zephyrproject}/zephyr",
+			"board_path": "${config:bsp.board_root}/boards/arm/${config:bsp.board}",
+			"svd": "${workspaceFolder}/modules/hal/rpi_pico/src/rp2040/hardware_regs/rp2040.svd",
+		},
+
+		// App settings:
+		"app": {
+			"name": "${workspaceFolder:AppUnderDev}",
+			"build_dir": "${workspaceFolder:AppUnderDev}/build",
+			"zephyr_config": "",  // -DOVERLAY_CONFIG=<path_relative_to_sample> use ; for multiple files
+			"zephyr_dtc_overlay": "",  // "-DDTC_OVERLAY_FILE=boards/nucleo_f303re.overlay"  // -DDTC_OVERLAY_FILE=<path_relative_to_sample> use ; for multiple files
+			"compile_args": ""
+		},
+		
+		// Bootloader app settings:
+		"app_boot": {
+			"name": "${workspaceFolder:BootloaderUnderDev}",
+			"build_dir": "${workspaceFolder:BootloaderUnderDev}/build",
+			"zephyr_config": "",  // -DOVERLAY_CONFIG=<path_relative_to_sample> use ; for multiple files
+			"zephyr_dtc_overlay": "",// "-DDTC_OVERLAY_FILE=boards/nucleo_f303re.overlay"  // -DDTC_OVERLAY_FILE=<path_relative_to_sample> use ; for multiple files
+			"compile_args": ""
+		},
+		"C_Cpp.default.compilerPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}/bin/arm-zephyr-eabi-gcc",
+		"C_Cpp.default.compileCommands": "${config:app.build_dir}/compile_commands.json",
+		"C_Cpp.default.includePath": [
+			"${workspaceFolder:zephyrproject}/zephyr",
+			"${env:GNUARMEMB_TOOLCHAIN_PATH}/arm-zephyr-eabi/include",
+			"${env:GNUARMEMB_TOOLCHAIN_PATH}/arm-zephyr-eabi/sys-include"
+		],
+		
+		"cmake.configureOnOpen": false,
+
+		"files.associations": {
+		},
+
+		// The number of spaces a tab is equal to. This setting is overridden
+		// based on the file contents when `editor.detectIndentation` is true.
+		"editor.tabSize": 8,
+
+		// Insert spaces when pressing Tab. This setting is overriden
+		// based on the file contents when `editor.detectIndentation` is true.
+		"editor.insertSpaces": false,
+
+		// When opening a file, `editor.tabSize` and `editor.insertSpaces`
+		// will be detected based on the file contents. Set to false to keep
+		// the values you've explicitly set, above.
+		"editor.detectIndentation": false,
+		"editor.rulers": [80],
+
+		"editor.cursorBlinking": "smooth",
+
+		"files.trimFinalNewlines": true,
+		"editor.formatOnSave": false,
+		"editor.codeActionsOnSave": [],
+
+		"editor.renderWhitespace": "all",
+
+		"files.watcherExclude": {
+			"**/.git/objects/**": true,
+			"**/.git/subtree-cache/**": true,
+			"**/node_modules/**": true,
+			"**/tmp/**": true,
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/CVS": true,
+			"**/.DS_Store": true,
+			"**/node_modules": true,
+			"**/bower_components": true,
+			"**/dist/**": true,
+			"**/log/**": true,
+			"**/logs/**": true,
+			"**/.fdk/**": true,
+			"**/.west/**": true,
+			"**/.vscode/**": true,
+			"${workspaceRoot}/../zephyr/**": true
+		},
+		"files.exclude": {
+			"**/.git/objects/**": true,
+			"**/.git/subtree-cache/**": true,
+			"**/node_modules/**": true,
+			"**/tmp/**": true,
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/CVS": true,
+			"**/.DS_Store": true,
+			"**/node_modules": true,
+			"**/bower_components": true,
+			"**/dist/**": true,
+			"**/log/**": true,
+			"**/.fdk/**": true,
+			"**/.west/**": true
+		},
+		"search.exclude": {
+			"**/.git/objects/**": true,
+			"**/.git/subtree-cache/**": true,
+			"**/node_modules/**": true,
+			"**/tmp/**": true,
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/CVS": true,
+			"**/.DS_Store": true,
+			"**/node_modules": true,
+			"**/bower_components": true,
+			"**/dist/**": true,
+			"**/log/**": true,
+			"**/.west/**": true
+		},
+		"editor.renderControlCharacters": false,
+		"cortex-debug.variableUseNaturalFormat": false
+	}
+}

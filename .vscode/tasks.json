@@ -1,0 +1,119 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Flash App",
+			"type": "process",
+			"group": "build",
+			"command": "openocd",
+			"args": [
+				"-f",
+				"interface/cmsis-dap.cfg",
+				"-f",
+				"target/rp2040.cfg",
+				"-c",
+				"program ${config:app.build_dir}/zephyr/zephyr.elf reset exit",
+			],
+			 "dependsOn": [
+			 	 "West Build App",
+			],
+		},
+
+		{
+			"label": "West Build App",
+			"type": "process",
+			"group": "build",
+			"command": "${config:west}",
+			"args": [
+				"build",
+				"-p",
+				"auto",
+				"-d",
+				"${config:app.build_dir}",
+				"-b",
+				"${config:bsp.board}${config:bsp.cpu}",
+				"${config:app.name}",
+				"${config:app.zephyr_config}",
+				"${config:app.zephyr_dtc_overlay}",
+				"${config:app_boot.compile_args}"
+			],
+			"dependsOn": [
+				"Clean Build App",
+			 ],
+			"problemMatcher": [ "$gcc" ]
+		},
+		{
+			"label": "West Build Bootloader",
+			"type": "process",
+			"group": "build",
+			"command": "${config:west}",
+			"args": [
+				"build",
+				"-p",
+				"auto",
+				"-d",
+				"${config:app_boot.build_dir}",
+				"-b",
+				"${config:bsp.board}${config:bsp.cpu}",
+				"${config:app_boot.name}",
+				"${config:app_boot.zephyr_config}",
+				"${config:app_boot.zephyr_dtc_overlay}",
+				"${config:app_boot.compile_args}"
+			],
+			"dependsOn": [
+				// "Clean Build",
+			 ],
+			"problemMatcher": [ "$gcc" ]
+		},
+		{
+			"label": "Set West Source",
+			"type": "process",
+			"group": "build",
+			"command": "${config:west}",
+			"args": [
+				"config",
+				"zephyr.base",
+				"${workspaceFolder:zephyrproject}/zephyr"
+			],
+			"dependsOn": [],
+			"problemMatcher": []
+		},
+		{
+			"label": "Set West Source Prefer",
+			"type": "process",
+			"group": "build",
+			"command": "${config:west}",
+			"args": [
+				"config",
+				"zephyr.base-prefer",
+				"configfile"
+			],
+			"dependsOn": [],
+			"problemMatcher": []
+		},
+		{
+			"label": "Clean Build App",
+			"type": "shell",
+			"group": "build",
+			"command": "rm",
+			"args": [
+				"-rf",
+				"${config:app.build_dir}"
+			],
+			"dependsOn": [],
+			"problemMatcher": []
+		},
+		{
+			"label": "Clean Build Bootloader",
+			"type": "shell",
+			"group": "build",
+			"command": "rm",
+			"args": [
+				"-rf",
+				"${config:app_boot.build_dir}"
+			],
+			"dependsOn": [],
+			"problemMatcher": []
+		}
+	]
+}
