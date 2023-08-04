@@ -14,7 +14,7 @@
 		"device": "${config:bsp.soc}",
 		"targetId": "${config:bsp.board}",
 		"boardId": "1",
-		"toolchainPrefix": "/home/rg/workspace/libs/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin/arm-zephyr-eabi",
+		"toolchainPrefix": "${userHome}/workspace/libs/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin/arm-zephyr-eabi",
 		"armToolchainPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}",
 		"svdFile": "${config:bsp.svd}",
 		"showDevDebugOutput": "raw",
