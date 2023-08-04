@@ -33,7 +33,7 @@ Download SDK
 # cd ~/workspace/zephyrproject
 # west update
 # west zephyr-export
-# git clone https://github.com/Nukersson/zephyr_vscode_workspace.git
+# git clone https://github.com/scramjetorg/platform-pico-development.git
 ```
 
 ## Pico and Picoprobe USB device passthrough to WSL
@@ -43,13 +43,12 @@ Bind usb ports:
 Install [USBIPd](https://github.com/dorssel/usbipd-win/), windows software for sharing locally connected USB devices to other machines, including Hyper-V guests and WSL2. 
 
 ```
-# usbipd bind --force --hardware-id 2e8a:000a
 # usbipd bind --force --hardware-id 2e8a:000c
 ```
 
 > [!NOTE]  
-> * Raspberry Pi Pico is reported by system as device with hardware ID `2e8a:000a`.
-> *  Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
+> Raspberry Pi Debug Probe probe is reported by system as device with hardware ID `2e8a:000c`.
+>
 
 ### On Ubuntu
 Install required packages
@@ -70,7 +69,6 @@ Bus 001 Device 002: ID 2e8a:000c Raspberry Pi Debug Probe (CMSIS-DAP)
 Attach ports to WSL:
 
 ```
-# usbipd wsl attach --hardware-id 2e8a:000a
 # usbipd wsl attach --hardware-id 2e8a:000c
 ```
 
@@ -79,7 +77,6 @@ Attach ports to WSL:
 >	Attaching is required every time you restart WSL /  your computer, I suggest to create a simple Powershell script `AttachDebugger.ps1` with code:
 >
 >	```
-> 	usbipd wsl attach --hardware-id 2e8a:000a
 >	usbipd wsl attach --hardware-id 2e8a:000c
 >
 >	Write-Host "Press any key to continue..."
@@ -143,233 +140,13 @@ Info : [rp2040.core0] Cortex-M0+ r0p1 processor detected
 Info : Listening on port 3333 for gdb connections
 ```
 
-# Download Scramjet repository
-
-```
-# cd ~/workspace
-# git clone git@github.com:scramjetorg/platform-pico-development.git
-```
-
-# VS Code configuration files:
-
-## Zephyr.code-workspace
-
-Change file under path: `~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace`
-
-To following:
-
-```
-{
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"name": "zephyrproject",
-			"path": "../"
-		},
-		{
-			"name": "AppUnderDev",
-			"path": "../../platform-pico-development"
-		},
-		{
-			"name": "ZephyrTests",
-			"path": "../zephyr/tests/net/socket/websocket"
-		},
-		{
-			"name": "BootloaderUnderDev",
-			"path": "../bootloader/mcuboot/boot/zephyr"
-		}
-	],
-
-	"settings": {
-		"west": "west",
-		"twister":  {
-			"host_test_arch": "qemu_x86",
-		},
-		// Board support package settings:
-		"bsp": {
-			"cpu": "",  // must be used if multi core system (put _m4 or _m7 here for example)
-			"soc": "RP2040",
-			"board": "rpi_pico",
-			"board_root": "${workspaceFolder:zephyrproject}/zephyr",
-			"board_path": "${config:bsp.board_root}/boards/arm/${config:bsp.board}",
-			"svd": "${workspaceFolder}/modules/hal/rpi_pico/src/rp2040/hardware_regs/rp2040.svd",
-		},
-
-		// App settings:
-		"app": {
-			"name": "${workspaceFolder:AppUnderDev}",
-			"build_dir": "${workspaceFolder:AppUnderDev}/build",
-			"zephyr_config": "",  // -DOVERLAY_CONFIG=<path_relative_to_sample> use ; for multiple files
-			"zephyr_dtc_overlay": "",  // "-DDTC_OVERLAY_FILE=boards/nucleo_f303re.overlay"  // -DDTC_OVERLAY_FILE=<path_relative_to_sample> use ; for multiple files
-			"compile_args": ""
-		},
-
-		// Bootloader app settings:
-		"app_boot": {
-			"name": "${workspaceFolder:BootloaderUnderDev}",
-			"build_dir": "${workspaceFolder:BootloaderUnderDev}/build",
-			"zephyr_config": "",  // -DOVERLAY_CONFIG=<path_relative_to_sample> use ; for multiple files
-			"zephyr_dtc_overlay": "",  // "-DDTC_OVERLAY_FILE=boards/nucleo_f303re.overlay"  // -DDTC_OVERLAY_FILE=<path_relative_to_sample> use ; for multiple files
-			"compile_args": ""
-		},
-
-		"C_Cpp.default.compilerPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}/bin/arm-zephyr-eabi-gcc",
-		"C_Cpp.default.compileCommands": "${config:app.build_dir}/compile_commands.json",
-		"C_Cpp.default.includePath": [
-			"${workspaceFolder:zephyrproject}/zephyr",
-			"${env:GNUARMEMB_TOOLCHAIN_PATH}/arm-zephyr-eabi/include",
-			"${env:GNUARMEMB_TOOLCHAIN_PATH}/arm-zephyr-eabi/sys-include"
-		],
-		
-		"cmake.configureOnOpen": false,
-
-		"files.associations": {
-		},
-
-		// The number of spaces a tab is equal to. This setting is overridden
-		// based on the file contents when `editor.detectIndentation` is true.
-		"editor.tabSize": 8,
-
-		// Insert spaces when pressing Tab. This setting is overriden
-		// based on the file contents when `editor.detectIndentation` is true.
-		"editor.insertSpaces": false,
-
-		// When opening a file, `editor.tabSize` and `editor.insertSpaces`
-		// will be detected based on the file contents. Set to false to keep
-		// the values you've explicitly set, above.
-		"editor.detectIndentation": false,
-		"editor.rulers": [80],
-
-		"editor.cursorBlinking": "smooth",
-
-		"files.trimFinalNewlines": true,
-		"editor.formatOnSave": false,
-		"editor.codeActionsOnSave": [],
-
-		"editor.renderWhitespace": "all",
-
-		"files.watcherExclude": {
-			"**/.git/objects/**": true,
-			"**/.git/subtree-cache/**": true,
-			"**/node_modules/**": true,
-			"**/tmp/**": true,
-			"**/.git": true,
-			"**/.svn": true,
-			"**/.hg": true,
-			"**/CVS": true,
-			"**/.DS_Store": true,
-			"**/node_modules": true,
-			"**/bower_components": true,
-			"**/dist/**": true,
-			"**/log/**": true,
-			"**/logs/**": true,
-			"**/.fdk/**": true,
-			"**/.west/**": true,
-			"**/.vscode/**": true,
-			"${workspaceRoot}/../zephyr/**": true
-		},
-		"files.exclude": {
-			"**/.git/objects/**": true,
-			"**/.git/subtree-cache/**": true,
-			"**/node_modules/**": true,
-			"**/tmp/**": true,
-			"**/.git": true,
-			"**/.svn": true,
-			"**/.hg": true,
-			"**/CVS": true,
-			"**/.DS_Store": true,
-			"**/node_modules": true,
-			"**/bower_components": true,
-			"**/dist/**": true,
-			"**/log/**": true,
-			"**/.fdk/**": true,
-			"**/.west/**": true
-		},
-		"search.exclude": {
-			"**/.git/objects/**": true,
-			"**/.git/subtree-cache/**": true,
-			"**/node_modules/**": true,
-			"**/tmp/**": true,
-			"**/.git": true,
-			"**/.svn": true,
-			"**/.hg": true,
-			"**/CVS": true,
-			"**/.DS_Store": true,
-			"**/node_modules": true,
-			"**/bower_components": true,
-			"**/dist/**": true,
-			"**/log/**": true,
-			"**/.west/**": true
-		},
-		"editor.renderControlCharacters": false,
-		"cortex-debug.variableUseNaturalFormat": false
-	}
-}
-```
-
-# launch.json
-
-Change file under path: ~/workspace/zephyrproject/zephyr_vscode_workspace/.vscode/launch.json
-
-To following:
-
-```
-{
-	"version": "2.0.0",
-	// See available parameters under:
-	// 	https://github.com/Marus/cortex-debug/blob/master/src/common.ts#LL249C25-L249C25
-	"configurations": [
-	{
-		"name": "Flash & Debug AppUnderDev",
-		"cwd": "${workspaceFolder:AppUnderDev}",
-		"executable": "${config:app.build_dir}/zephyr/zephyr.elf",
-		"request": "launch",
-		"type": "cortex-debug",
-		"servertype": "openocd",
-		"interface": "swd",
-		"device": "${config:bsp.soc}",
-		"targetId": "${config:bsp.board}",
-		"boardId": "1",
-		"toolchainPrefix": "${userHome}/workspace/libs/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin/arm-zephyr-eabi",
-		"armToolchainPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}",
-		"svdFile": "${config:bsp.svd}",
-		"showDevDebugOutput": "raw",
-		"configFiles": [
-			"/interface/cmsis-dap.cfg",
-			"/target/rp2040.cfg"
-		    ],
-	},
-	{
-		"name": "Flash & Debug BootloaderUnderDev",
-		"cwd": "${workspaceFolder:BootloaderUnderDev}",
-		"executable": "${config:app_boot.build_dir}/zephyr/zephyr.elf",
-		"request": "launch",
-		"type": "cortex-debug",
-		"servertype": "openocd",
-		"interface": "swd",
-		"device": "${config:bsp.soc}",
-		"targetId": "${config:bsp.board}",
-		"boardId": "1",
-		"toolchainPrefix": "arm-zephyr-eabi",
-		"armToolchainPath": "${env:GNUARMEMB_TOOLCHAIN_PATH}",
-		"svdFile": "${config:bsp.svd}",
-		"showDevDebugOutput": "raw",
-		"configFiles": [
-				"${config:bsp.debug_config}"
-			]
-	}
-	]
-}
-```
 # Run workspace in VS Code
 
-In VS Code select: `File`->`Open Workspace from File` and select path: `~/workspace/zephyrproject/zephyr_vscode_workspace/Zephyr.code-workspace`
+In VS Code select: `File`->`Open Workspace from File` and select path: `~/workspace/zephyrproject/platform-pico-development/development.code-workspace`
 
 Press `Ctrl + Shift + P` and select `Tasks: Run build tasks`
 
-Run `West Build app`
+Run `Flash App`
 
 You should get something like that:
 
@@ -387,9 +164,20 @@ Memory region         Used Size  Region Size  %age Used
 Converting to uf2, output size: 38400, start address: 0x10000000
 Wrote 38400 bytes to zephyr.uf2
  *  Terminal will be reused by tasks, press any key to close it. 
- ```
 
-After hitting `F5` (or select `Start Debugging`) you should be able to flash and debug your Pico.
+ (...)
+ ** Programming Started **
+Info : Found flash device 'win w25q16jv' (ID 0x001540ef)
+Info : RP2040 B0 Flash Probe: 2097152 bytes @0x10000000, in 32 sectors
+
+Info : Padding image section 3 at 0x100062b0 with 80 bytes (bank write end alignment)
+Warn : Adding extra erase range, 0x10006300 .. 0x1000ffff
+** Programming Finished **
+** Resetting Target **
+shutdown command invoked
+```
+
+After hitting `F5` (or select `Start Debugging`) you should be able to debug your Pico.
 
 Sources:
 

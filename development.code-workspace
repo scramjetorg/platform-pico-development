@@ -100,9 +100,11 @@
 			"**/.fdk/**": true,
 			"**/.west/**": true,
 			"**/.vscode/**": true,
+			"**/build/**": true,
 			"${workspaceRoot}/../zephyr/**": true
 		},
 		"files.exclude": {
+			"**/build/**": true,
 			"**/.git/objects/**": true,
 			"**/.git/subtree-cache/**": true,
 			"**/node_modules/**": true,
