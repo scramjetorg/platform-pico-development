@@ -26,7 +26,9 @@ Download SDK
 # cd zephyr-sdk-0.16.1
 # ./setup.sh
 ```
+
 ## VS code workspace schema
+
 ``` 
 # mkdir -p ~/workspace/zephyrproject
 # west init ~/workspace/zephyrproject
@@ -104,6 +106,7 @@ Attach ports to WSL:
 # make -j4
 # sudo make install
 ```
+
 Configure udev
 ```
 # wget https://raw.githubusercontent.com/raspberrypi/openocd/rp2040/contrib/60-openocd.rules
