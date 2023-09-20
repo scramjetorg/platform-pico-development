@@ -1,12 +1,13 @@
-#include <zephyr/kernel.h>
 #include <sequence.h>
 
 const char* sequenceName(void){
 	return "Sequence hello";
 }
 
-int run(void)
+int run(readCb read, writeCb write)
 {
-	printk("Hello from userspace!\n");
+	uint8_t readBuffor[16];
+	uint16_t dataRead = read(readBuffor, 16);
+	write(readBuffor, dataRead);
 	return 0;
 }
