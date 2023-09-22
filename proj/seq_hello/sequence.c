@@ -6,9 +6,9 @@ const char* sequenceName(void){
 
 int run(readCb read, writeCb write)
 {
-	uint8_t readBuffor[16];
-	uint16_t dataRead = read(readBuffor, 16);
+	uint8_t readBuffer[16];
+	uint16_t dataRead = read(readBuffer, 16);
 	if(dataRead > 0)
-		write(readBuffor, dataRead);
+		write(readBuffer, dataRead);
 	return 0;
 }
