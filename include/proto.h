@@ -1,3 +1,6 @@
+#ifndef SCARMJET_DRIVER
+#define SCARMJET_DRIVER
+
 #include <zephyr/sys/ring_buffer.h>
 
 #ifndef EINVAL
@@ -7,11 +10,13 @@
 #define MAX_HEADER_SIZE 3
 #define SCRAMJET_INPUT_SIZE 256
 
+/* Enumeration representing the driver work state*/
 typedef enum {
-	waitingForCommand,
+	WaitingForCommand,
 	InputReceiving,
 } state_t;
 
+/* Enumeration representing the scramjet protocol commands*/
 enum command {
 	Ping = 0,
 	Pong,
@@ -27,113 +32,87 @@ typedef uint8_t cmd_t;
 
 typedef uint16_t (*writeToRunnerCb)(const uint8_t* data, uint16_t size);
 
-typedef struct Scramjet_driver {
+/**
+ * @brief A structure to represent a scramjet driver
+ */
+typedef struct scramjet_driver {
 	state_t state;
-	uint8_t protoHeader[MAX_HEADER_SIZE];
-	uint8_t protoHeaderLength;
+	uint8_t header[MAX_HEADER_SIZE];
+	uint8_t headerLength;
 	struct ring_buf inputRingBuff;
 	bool flood;
 	writeToRunnerCb writeRunnerCb;
 	const char* boardName;
 	uint16_t nameLen;
-} Scramjet_driver_t;
+} scramjet_driver_t;
 
-void initialize_driver(Scramjet_driver_t* driver, writeToRunnerCb send, const char* boardName){
-	driver->state = waitingForCommand;
-	driver->protoHeaderLength = 0;
-	uint8_t* input = k_malloc(SCRAMJET_INPUT_SIZE);
-	ring_buf_init(&driver->inputRingBuff, SCRAMJET_INPUT_SIZE, input);
-	driver->flood = false;
-	driver->writeRunnerCb = send;
-	driver->boardName = boardName;
-	driver->nameLen = strlen(driver->boardName);
-}
+/**
+ * @brief Initialize a scramjet driver.
+ *
+ * This routine initializes a scramjet driver, prior to its first use.
+ *
+ * @param  driver  Address of scramjet driver.
+ * @param send Callback used to send data to a communication channel.
+ * @param boardName Pointer to a string name of the user sequence.
+ */
+void driver_initialize(scramjet_driver_t* driver, writeToRunnerCb send, const char* boardName);
 
-void remove_driver(Scramjet_driver_t* driver){
-	k_free(driver->inputRingBuff.buffer);
-}
+/**
+ * @brief Free allocated resources by the scramjet driver.
+ *
+ * @param[in]  driver  Address of scramjet driver.
+ */
+void driver_remove(scramjet_driver_t* driver);
 
-void handlePing(Scramjet_driver_t* driver){
-	if(driver->protoHeaderLength < 3) return;
-	driver->protoHeader[0] = (cmd_t)Pong;
-	driver->writeRunnerCb(driver->protoHeader, 3);
-}
+/**
+ * @brief Get address of a valid data in driver buffers depending on state.
+ *
+ * With this routine, memory copying can be reduced since internal buffer
+ * can be used directly by the user. Once data is processed it must be freed
+ * using @ref driver_put_finish.
+ *
+ * @param[in]  driver  Address of scramjet driver.
+ * @param[out] data Pointer to the address. It is set to a location within
+ *		    internal buffers.
+ *
+ * @return Number of valid bytes in the provided buffer.
+ */
+uint32_t driver_put_claim(scramjet_driver_t* driver, uint8_t **data);
 
-uint32_t driver_put_claim(Scramjet_driver_t* driver, uint8_t **data){
-	if(driver->state == InputReceiving){
-		uint16_t inputToRead = (uint16_t)driver->protoHeader[1] << 8 | driver->protoHeader[2];
-		return ring_buf_put_claim(&driver->inputRingBuff, data, inputToRead);
-	} else {
-		if(driver->protoHeaderLength > 2){
-			data = NULL;
-			return 0;
-		}
-		*data = driver->protoHeader + driver->protoHeaderLength;
-		return MAX_HEADER_SIZE - driver->protoHeaderLength;
-	}
-}
-int driver_put_finish(Scramjet_driver_t* driver, uint32_t size){
-	if(driver->state == InputReceiving){
-		ring_buf_put_finish(&driver->inputRingBuff, size);
-		
-		uint16_t inputToRead = (uint16_t)driver->protoHeader[1] << 8 | driver->protoHeader[2];
-		inputToRead -= size;
-		driver->protoHeader[1] = (uint16_t)inputToRead >> 8;
-		driver->protoHeader[2] = (uint8_t)inputToRead;
-		if(inputToRead == 0) {
-			driver->protoHeaderLength = 0;
-			driver->state = waitingForCommand;
-		}
-		return size;
-	} else {
-		if(MAX_HEADER_SIZE - driver->protoHeaderLength - size >= 0){
-			driver->protoHeaderLength += size;
-			return 0;
-		}
-		return -EINVAL;
-	}
-}
+/**
+ * @brief Indicate number of bytes written to allocated buffers.
+ *
+ * The number of bytes must be equal to or lower than the sum corresponding
+ * to all preceding @ref driver_put_claim invocations (or even 0).
+ *
+ * @param  driver  Address of scramjet driver.
+ * @param  size Number of valid bytes in the allocated buffers.
+ *
+ * @retval 0 Successful operation.
+ * @retval -EINVAL Provided if size exceeds free space in the buffer.
+ */
+int driver_put_finish(scramjet_driver_t* driver, uint32_t size);
 
-void sendCommandWithPayload(Scramjet_driver_t* driver, cmd_t command, uint16_t payload_size, const uint8_t* payload){
-	driver->protoHeader[0] = (cmd_t)command;
-	driver->protoHeader[1] = (uint16_t)payload_size >> 8;
-	driver->protoHeader[2] = (uint8_t)payload_size;
-	driver->writeRunnerCb(driver->protoHeader, MAX_HEADER_SIZE);
-	driver->writeRunnerCb(payload, payload_size);
-};
+/**
+ * @brief Send command with provided data.
+ *
+ * If payloadSize is equal to 0 only protocol header is send.
+ *
+ * @param  driver  Address of scramjet driver.
+ * @param  command  Code of command to send.
+ * @param  payloadSize Size of payload (in bytes) to send.
+ * @param  payload Pointer to the begining of data to be send as payload.
+ *
+ * @retval 0 Successful operation.
+ * @retval -EINVAL Provided if size exceeds free space in the buffer.
+ */
+void driver_send_cmd(scramjet_driver_t* driver, cmd_t command, uint16_t payloadSize, const uint8_t* payload);
 
-void output(Scramjet_driver_t* driver, const uint8_t* payload, uint16_t payload_size){
-	return sendCommandWithPayload(driver, (cmd_t)Output, payload_size, payload);
-}
+/**
+ * @brief Start parsing driver state based on current data in buffers.
+ *
+ * @param  driver  Address of scramjet driver.
+ */
+void driver_parse_buffer(scramjet_driver_t* driver);
 
-void parse(Scramjet_driver_t* driver){
-	if(driver->state == InputReceiving)	return;
-	
-	switch(driver->protoHeader[0]){
-		case Ping:
-			handlePing(driver);
-			driver->protoHeaderLength = 0;
-			break;
-		case NameRequest:
-			sendCommandWithPayload(driver, (cmd_t)NameResponse, driver->nameLen, driver->boardName);
-			driver->protoHeaderLength = 0;
-			break;
-		case FloodOn:
-			driver->flood = true;
-			driver->protoHeaderLength = 0;
-			return;
-		case FloodOff:
-			driver->flood = false;
-			driver->protoHeaderLength = 0;
-			return;
-		case Input:
-			if(driver->protoHeaderLength < 3) return;
-			driver->state =	InputReceiving;
-			break;
-		default:
-			const char errCode[] = "Unknown cmd_code";
-			sendCommandWithPayload(driver, (cmd_t)Error, 16, errCode);
-			driver->protoHeaderLength = 0;
-			return;
-	}
-}
+#endif /* SCARMJET_DRIVER */
