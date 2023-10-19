@@ -2,10 +2,35 @@
 	chosen {
 		zephyr,console = &cdc_acm_uart0;
 	};
+	zephyr,user {
+		io-channels = <&adc 0>;
+	};
+	aliases {
+             led0 = &myled0;
+	};
+	leds {
+             compatible = "gpio-leds";
+             myled0: led_0 {
+                     gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+             };
+     	};
 };
 
 &zephyr_udc0 {
 	cdc_acm_uart0: cdc_acm_uart0 {
 		compatible = "zephyr,cdc-acm-uart";
 	};	
+};
+
+&adc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
 };
