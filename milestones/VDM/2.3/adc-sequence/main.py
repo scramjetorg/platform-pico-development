@@ -1,0 +1,296 @@
+provides = {
+   'contentType': 'application/octet-stream'
+}
+
+from scipy.io import wavfile
+import noisereduce as nr
+import string
+import wave
+import asyncio
+import glob
+import time
+import struct
+import random
+
+from os import system
+from enum import Enum
+from scramjet.streams import Stream
+from serial_asyncio import open_serial_connection
+
+#Regular expression to find MCU devices with UART
+DEVICE_REGEXP = '/dev/ttyAC?[0-9]*'
+
+#Single chunk size for read. In bytes.
+CHUNK_SIZE = 128
+
+#UART baudrate
+BAUDRATE  = 115200 
+
+#List of required MCUs names
+REQUIRED_MCU_NAMES = ['PicoMic#000', 'PicoLED#000']
+
+TEST_DURATION_IN_SEC = 20
+
+RECORDING_TIME = 3
+
+FRAME_RATE = 8000
+
+TEMP_DIR = "/tmp/"
+
+
+class ScramjetMCUProtocol:
+
+    class _Commands(Enum):
+        Ping = 0,
+        Pong = 1,
+        NameRequest = 2,
+        NameResponse = 3,
+        Input = 6,
+        Output = 7,
+        Error = 8,
+        Undefined = 9 
+
+    @staticmethod
+    async def send_input(dev, data=None):
+        writer = dev["writer"]
+        writer.write(struct.pack("!B", ScramjetMCUProtocol._Commands.Input.value[0]))
+
+        for item in data:
+            writer.write(struct.pack("!H", item))
+        await writer.drain()
+
+    @staticmethod
+    async def send_request(dev, command, param=None):
+        
+        writer = dev["writer"]
+
+        # requests with 2-byte param
+        if command in [ScramjetMCUProtocol._Commands.Ping]:
+            writer.write(struct.pack("!BH",command.value[0], param))
+            await writer.drain()
+
+        # requests without 2-byte param
+        if command in [ScramjetMCUProtocol._Commands.NameRequest]:
+            writer.write(struct.pack("!B", command.value[0]))
+            await writer.drain()
+
+    @staticmethod
+    async def get_response(dev):
+        
+        reader = dev['reader']
+        try:
+            command = ScramjetMCUProtocol._Commands(struct.unpack("!B", await asyncio.wait_for(reader.read(1),1)))
+        except asyncio.TimeoutError:
+            return ScramjetMCUProtocol._Commands.Error, 'Command waiting timeout'
+
+        # response without 2-byte param, *without* size and payload
+        if command in [ScramjetMCUProtocol._Commands.Pong]:
+            return command, struct.unpack("!H",await reader.read(2))[0]
+
+        # response without 2-byte param, *with* size and payload
+        if command in [ScramjetMCUProtocol._Commands.NameResponse, ScramjetMCUProtocol._Commands.Error]:
+            size = struct.unpack("!H",await reader.read(2))[0]
+            payload = (struct.unpack( ("!%ds" % size), await reader.read(size))[0]).decode(encoding="ascii")
+            return command, payload
+
+class Peripherals:
+    @staticmethod
+    async def turnMicOn(dev):
+        await ScramjetMCUProtocol.send_input(dev, [1, 1])
+
+    @staticmethod
+    async def turnMicOff(dev):
+        await ScramjetMCUProtocol.send_input(dev, [1, 0])
+
+    @staticmethod
+    async def turnLedOn(dev):
+        await ScramjetMCUProtocol.send_input(dev, [1, 3])
+
+    @staticmethod
+    async def turnLedOff(dev):
+        await ScramjetMCUProtocol.send_input(dev, [1, 2])
+
+class DataProcessing:
+
+    async def read_adc(self, dev, stop_event, saved_files):
+        await Peripherals.turnMicOn(dev)
+
+        while not stop_event.is_set():
+            filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8)) + ".wav"
+            inputFilePath = TEMP_DIR + filename
+            wavWrite = self.openAndSetInputFile(inputFilePath, 2 * FRAME_RATE)
+            await self.gatherAdcSamples(dev, FRAME_RATE * RECORDING_TIME, wavWrite)
+            wavWrite.close()
+            await saved_files.put(filename)
+        await Peripherals.turnMicOff(dev)
+
+    async def denoise_and_send(self, stop_event, captured_files, stream):
+        noiseFilename = ''
+        noiseRate, noiseData = wavfile.read(noiseFilename)
+
+        while not stop_event.is_set():
+            try:
+                captured_file = await asyncio.wait_for(captured_files.get(),2)
+            except asyncio.TimeoutError:
+                await asyncio.sleep(0)
+                continue
+
+            rate, data = wavfile.read(TEMP_DIR + captured_file)
+            reduced_noise = nr.reduce_noise(y=data, sr=rate, y_noise=noiseData, time_constant_s= 1)
+            #wavfile.write(outputFilename, rate, reduced_noise)
+            stream.write(reduced_noise)
+            await captured_files.task_done()
+
+    def openAndSetInputFile(self, filePath: str, frameRate: int):
+        wavWrite = wave.open(filePath, "wb")
+        wavWrite.setnchannels(1)
+        wavWrite.setsampwidth(2)
+        wavWrite.setframerate(frameRate)
+        wavWrite.setcomptype('NONE', 'not compressed')
+        return wavWrite
+
+    async def gatherAdcSamples(self, dev, framesCount: int, outputFile: wave.Wave_write): 
+        no_frames = 0
+        previousFrame = 0
+
+        s = dev['reader']
+
+        while (True):
+            header = await s.read(1)
+
+            if (header == b''):
+                continue
+            if (header != b'\x07'):
+                continue
+
+            sizeRaw = await s.read(2)
+            size = struct.unpack("!H", sizeRaw)[0]
+            data = await s.read(size)
+            frame = struct.unpack("!h", data)[0]
+            fakeFrame = int((previousFrame + frame)/2)
+            outputFile.writeframes(struct.pack("!h", fakeFrame))
+            previousFrame = frame
+            outputFile.writeframes(data)
+            no_frames += 1
+            print(f"Frame val: {frame} number: {no_frames}")
+            if (no_frames >= framesCount): break
+
+class MCUManager:
+
+    async def ping_device(self, dev):
+        
+        await self.flush_mcu_buffers(dev)
+
+        ping_request = random.randint(0, 10)
+        
+        await ScramjetMCUProtocol.send_request(dev,ScramjetMCUProtocol._Commands.Ping,ping_request)
+        
+        command, ping_response = await ScramjetMCUProtocol.get_response(dev)
+
+        if command == ScramjetMCUProtocol._Commands.Pong and ping_request == ping_response:
+            print(f'Device {dev["tty"]} OK')
+            return True 
+                     
+        print(f'Ping failed. Device {dev["tty"]} returned an error: {ping_response}')
+        return False
+
+
+    async def identify_device(self, dev):
+        await ScramjetMCUProtocol.send_request(dev,ScramjetMCUProtocol._Commands.NameRequest)
+            
+        command, name = await ScramjetMCUProtocol.get_response(dev)
+        
+        if command == ScramjetMCUProtocol._Commands.NameResponse:
+                dev['name'] = name
+                self.mcu.append(dev)
+                print(f'Device {dev["tty"]} identified as {dev["name"]}')
+                return True
+
+        print(f'Identify failed. Device {dev["tty"]} returned an error: {name}')
+        return False
+
+
+    async def close_connections(self):
+        for dev in self.mcu:
+
+            dev['writer'].close()
+            await dev['writer'].wait_closed()
+            print(f'Connection with device {dev["tty"]} closed')
+
+    async def prepare_connections(self):
+        
+        #Kill descriptors, sometimes it helps :D
+        for port in glob.glob(DEVICE_REGEXP):
+            system(f'fuser -k {port}')
+        
+        time.sleep(1)
+
+        for port in glob.glob(DEVICE_REGEXP):
+            reader, writer = await open_serial_connection(url=port, baudrate=BAUDRATE)
+            
+            dev = {'reader': reader, 'writer': writer, 'tty' : port}
+            
+            if not await self.ping_device(dev):
+                continue
+
+            if not await self.identify_device(dev):
+                continue
+            
+    def __init__(self, expected_mcus):
+        
+        self.stop_event = asyncio.Event()
+        self.start_event = asyncio.Event()
+        self.start_time = None
+        self.expected_mcus = expected_mcus
+        
+        self.mcu = []
+        self.throughput = {}
+
+    @property
+    def undetected_devices(self):
+        return self.expected_mcus
+    
+    async def flush_mcu_buffers(self, dev, timeout=1):
+        while True:
+            try:
+                chunk = await asyncio.wait_for(dev['reader'].read(CHUNK_SIZE),timeout)
+                if not chunk:
+                    break
+            except asyncio.TimeoutError:
+                break
+
+async def _watchdog(manager, stream, duration):
+
+    manager.start_event.set()
+    await asyncio.sleep(duration)
+    manager.stop_event.set()
+    stream.end()
+
+async def run(context, input, *args) -> Stream:
+
+    stream = Stream()
+    manager = MCUManager(REQUIRED_MCU_NAMES)
+    dp = DataProcessing()
+    captured_files = asyncio.Queue()
+    stop_event = asyncio.Event()
+
+    await manager.prepare_connections()
+
+    for dev in manager.mcu:
+
+        if dev['name'] == 'PicoMic#000':
+            task1 = asyncio.create_task(dp.read_adc(dev, stop_event, captured_files))
+
+        if dev['name'] == 'PicoLED#000':
+            task2 = asyncio.create_task(dp.denoise_and_send(stop_event, captured_files, stream))
+        
+    asyncio.create_task(_watchdog(manager, stream, TEST_DURATION_IN_SEC))
+    
+    return stream
+
+async def run_without_sth():
+    async for item in await run(context=None,input=None):
+        pass 
+
+if __name__ == "__main__":
+    asyncio.run(run_without_sth())
