@@ -24,9 +24,10 @@
 		"bsp": {
 			"cpu": "",
 			"soc": "RP2040",
-			"board": "rpi_pico",
+			"board": "rpi_pico_w",
 			"board_root": "${workspaceFolder:zephyrproject}/zephyr",
-			"board_path": "${config:bsp.board_root}/boards/arm/${config:bsp.board}",
+			// "board_path": "${config:bsp.board_root}/boards/arm/${config:bsp.board}",
+			"board_path": "${config:bsp.board_root}/boards/arm/rpi_pico",
 			"svd": "${workspaceFolder}/modules/hal/rpi_pico/src/rp2040/hardware_regs/rp2040.svd",
 		},
 
