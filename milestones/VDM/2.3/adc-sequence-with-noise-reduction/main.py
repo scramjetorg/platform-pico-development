@@ -106,9 +106,10 @@ class Peripherals:
         dev['writer'].write(struct.pack("!BHb", 6, 1, 2))
         await dev['writer'].drain()
 
+
 class DataProcessing:
 
-    async def read_adc(self, dev, stop_event, saved_files):
+    async def read_adc(self, dev: dict, stop_event: asyncio.Event, saved_files: list):
         await Peripherals.turnMicOn(dev)
 
         while not stop_event.is_set():
@@ -120,7 +121,7 @@ class DataProcessing:
             await saved_files.put(filename)
         await Peripherals.turnMicOff(dev)
 
-    async def denoise_and_send(self, stop_event, captured_files, stream):
+    async def denoise_and_send(self, stop_event: asyncio.Event, captured_files:list, stream: Stream):
         noiseRate, noiseData = wavfile.read(NOISE_FILENAME_PATH)
 
         while not stop_event.is_set():
@@ -136,6 +137,32 @@ class DataProcessing:
             stream.write(reduced_noise)
             await captured_files.task_done()
     
+    async def only_send(self, stop_event: asyncio.Event, captured_files: list, stream: Stream):
+        while not stop_event.is_set():
+            try:
+                captured_file = await asyncio.wait_for(captured_files.get(),2)
+            except asyncio.TimeoutError:
+                await asyncio.sleep(0)
+                continue
+
+            rate, data = wavfile.read(TEMP_DIR + captured_file)
+            #wavfile.write(outputFilename, rate, reduced_noise)
+            stream.write(data)
+            await captured_files.task_done()
+
+    async def manage_led(self, dev: dict, stop_event: asyncio.Event, input: Stream):
+        while not stop_event.is_set():
+            try:
+                response = await asyncio.wait_for(input.read(),2)
+            except asyncio.TimeoutError:
+                await asyncio.sleep(0)
+                continue
+
+            if response == 'On':
+                await Peripherals.turnLedOn(dev)
+
+            if response == 'Off':
+                await Peripherals.turnLedOff(dev)
 
     def openAndSetInputFile(self, filePath: str, frameRate: int):
         wavWrite = wave.open(filePath, "wb")
@@ -258,14 +285,12 @@ class MCUManager:
             except asyncio.TimeoutError:
                 break
 
-
 async def _watchdog(manager, stream, duration):
 
     manager.start_event.set()
     await asyncio.sleep(duration)
     manager.stop_event.set()
     stream.end()
-
 
 async def run(context, input, *args) -> Stream:
 
@@ -281,16 +306,19 @@ async def run(context, input, *args) -> Stream:
 
         if dev['name'] == 'PicoMic#000':
             asyncio.create_task(dp.read_adc(dev, stop_event, captured_files))
-            asyncio.create_task(dp.denoise_and_send(stop_event, captured_files, stream))
+            #asyncio.create_task(dp.denoise_and_send(stop_event, captured_files, stream))
+            asyncio.create_task(dp.only_send(stop_event, captured_files, stream))
 
-            asyncio.create_task(_watchdog(manager, stream, TEST_DURATION_IN_SEC))
-
+        if dev['name'] == 'PicoLed#000':
+            asyncio.create_task(dp.manage_led(dev, stop_event, input))
+    
+    asyncio.create_task(_watchdog(manager, stream, TEST_DURATION_IN_SEC))
+    
     return stream
 
-
 async def run_without_sth():
-    async for chunk in await run(context=None, input=None):
-        print(chunk)
+    async for chunk in await run(context=None,input=None):
+        print(chunk) 
 
 if __name__ == "__main__":
     asyncio.run(run_without_sth())
