@@ -11,6 +11,7 @@ import glob
 import time
 import struct
 import random
+import pickle 
 
 from os import system
 from enum import Enum
@@ -134,7 +135,10 @@ class DataProcessing:
             rate, data = wavfile.read(TEMP_DIR + captured_file)
             reduced_noise = nr.reduce_noise(y=data, sr=rate, y_noise=noiseData, time_constant_s= 1)
             #wavfile.write(outputFilename, rate, reduced_noise)
-            stream.write(reduced_noise)
+            stream.write('1337')
+            serialized = pickle.dumps(reduced_noise)
+            stream.write(len(serialized))
+            stream.write(serialized)
             await captured_files.task_done()
     
     async def only_send(self, stop_event: asyncio.Event, captured_files: list, stream: Stream):
@@ -147,7 +151,10 @@ class DataProcessing:
 
             rate, data = wavfile.read(TEMP_DIR + captured_file)
             #wavfile.write(outputFilename, rate, reduced_noise)
-            stream.write(data)
+            stream.write('1337')
+            serialized = pickle.dumps(data)
+            stream.write(len(serialized))
+            stream.write(serialized)
             await captured_files.task_done()
 
     async def manage_led(self, dev: dict, stop_event: asyncio.Event, input: Stream):
