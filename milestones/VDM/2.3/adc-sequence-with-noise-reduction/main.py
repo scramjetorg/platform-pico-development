@@ -139,6 +139,7 @@ class DataProcessing:
             serialized = pickle.dumps(reduced_noise)
             stream.write(len(serialized))
             stream.write(serialized)
+
             await captured_files.task_done()
     
     async def only_send(self, stop_event: asyncio.Event, captured_files: list, stream: Stream):
@@ -155,6 +156,7 @@ class DataProcessing:
             serialized = pickle.dumps(data)
             stream.write(len(serialized))
             stream.write(serialized)
+
             await captured_files.task_done()
 
     async def manage_led(self, dev: dict, stop_event: asyncio.Event, input: Stream):
