@@ -1,0 +1,1 @@
+DEVELOPMENT=1 sth --runtime-adapter process -S ./sth-rpi4/sth-rpi4-config.json -E -D ./sth-rpi4/sequences
