@@ -1,0 +1,1 @@
+DEVELOPMENT=1 sth --runtime-adapter process -S ./sth-cloud/sth-cloud-config.json -E -D ./sth-cloud/sequences
