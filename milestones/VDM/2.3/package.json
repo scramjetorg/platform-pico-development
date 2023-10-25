@@ -4,7 +4,7 @@
 	"author": "eryk.solecki@scramjet.org",
 	"scripts": {
 		"start:cloud": "./sth-cloud/startSthCloud.sh",
-		"start:rppi4": "./sth-rppi4/startSthRppi4.sh"
+		"start:rpi4": "./sth-rpi4/startSthRpi4.sh"
 	},
 	"repository": "https://github.com/scramjetorg/platform-pico-development",
 	"license": "MIT",

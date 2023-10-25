@@ -1,1 +1,0 @@
-DEVELOPMENT=1 sth --runtime-adapter process -S ./sth-rppi4/sth-rppi4-config.json -E -D ./sth-rppi4/sequences
