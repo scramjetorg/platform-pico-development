@@ -3,7 +3,6 @@ provides = {
 }
 
 from scipy.io import wavfile
-import noisereduce as nr
 import string
 import wave
 import asyncio
@@ -11,6 +10,7 @@ import glob
 import time
 import struct
 import random
+import pickle 
 
 from os import system
 from enum import Enum
@@ -121,22 +121,6 @@ class DataProcessing:
             await saved_files.put(filename)
         await Peripherals.turnMicOff(dev)
 
-    async def denoise_and_send(self, stop_event: asyncio.Event, captured_files:list, stream: Stream):
-        noiseRate, noiseData = wavfile.read(NOISE_FILENAME_PATH)
-
-        while not stop_event.is_set():
-            try:
-                captured_file = await asyncio.wait_for(captured_files.get(),2)
-            except asyncio.TimeoutError:
-                await asyncio.sleep(0)
-                continue
-
-            rate, data = wavfile.read(TEMP_DIR + captured_file)
-            reduced_noise = nr.reduce_noise(y=data, sr=rate, y_noise=noiseData, time_constant_s= 1)
-            #wavfile.write(outputFilename, rate, reduced_noise)
-            stream.write(reduced_noise)
-            await captured_files.task_done()
-    
     async def only_send(self, stop_event: asyncio.Event, captured_files: list, stream: Stream):
         while not stop_event.is_set():
             try:
@@ -147,8 +131,11 @@ class DataProcessing:
 
             rate, data = wavfile.read(TEMP_DIR + captured_file)
             #wavfile.write(outputFilename, rate, reduced_noise)
-            stream.write(data)
-            await captured_files.task_done()
+            stream.write('1337')
+            serialized = pickle.dumps(data)
+            stream.write(len(serialized))
+            stream.write(serialized)
+            captured_files.task_done()
 
     async def manage_led(self, dev: dict, stop_event: asyncio.Event, input: Stream):
         while not stop_event.is_set():
@@ -306,7 +293,6 @@ async def run(context, input, *args) -> Stream:
 
         if dev['name'] == 'PicoMic#000':
             asyncio.create_task(dp.read_adc(dev, stop_event, captured_files))
-            #asyncio.create_task(dp.denoise_and_send(stop_event, captured_files, stream))
             asyncio.create_task(dp.only_send(stop_event, captured_files, stream))
 
         if dev['name'] == 'PicoLed#000':
@@ -317,7 +303,7 @@ async def run(context, input, *args) -> Stream:
     return stream
 
 async def run_without_sth():
-    async for chunk in await run(context=None,input=None):
+    async for chunk in await run(context=None, input=Stream()):
         print(chunk) 
 
 if __name__ == "__main__":
