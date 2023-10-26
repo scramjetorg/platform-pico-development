@@ -5,7 +5,9 @@
 	"scripts": {
 		"cloud:fetch_ai": "./sth-cloud/fetchAiSequence.sh",
 		"start:cloud": "./sth-cloud/startSthCloud.sh",
-		"start:rpi4": "./sth-rpi4/startSthRpi4.sh"
+		"kill:cloud": "screen -S sth -X quit",
+		"start:rpi4": "./sth-rpi4/startSthRpi4.sh",
+		"kill:rpi4": "screen -S sthrpi -X quit"
 	},
 	"repository": "https://github.com/scramjetorg/platform-pico-development",
 	"license": "MIT",
