@@ -1,0 +1,1 @@
+git clone --filter=blob:none --depth=1 --branch=feat/vdm2-3-continuous-audio-detection  --sparse git@github.com:scramjetorg/deep-learning.git && cd deep-learning/ && git sparse-checkout set audio-training-seq/MK_2.3 --cone && cd ../ && mv deep-learning/audio-training-seq/MK_2.3 sth-cloud/sequences/audio-training-seq/ && rm -rf deep-learning/
