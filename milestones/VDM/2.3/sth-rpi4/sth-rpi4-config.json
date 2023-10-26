@@ -4,6 +4,11 @@
 	    "id": "ping",
 	    "args": [],
 	    "instanceId": "967f713a-5e5a-49f6-9849-8bf13740f461"
+	  },
+	  {
+	    "id": "adc_mic",
+	    "args": [],
+	    "instanceId": "e50f7fe8-113b-4353-960e-8f937596b6dd"
 	  }
 	]
 }
