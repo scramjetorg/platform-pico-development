@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"author": "eryk.solecki@scramjet.org",
 	"scripts": {
+		"cloud:fetch_ai": "./sth-cloud/fetchAiSequence.sh",
 		"start:cloud": "./sth-cloud/startSthCloud.sh",
 		"start:rpi4": "./sth-rpi4/startSthRpi4.sh"
 	},
