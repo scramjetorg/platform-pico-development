@@ -4,6 +4,12 @@
 	    "id": "echo",
 	    "args": [],
 	    "instanceId": "6dd0e6aa-94da-420f-a67f-6df2a6706912"
+	  },
+	  {
+	    "id": "audio-training-seq",
+	    "args": [],
+	    "instanceId": "2bf167a6-a9e4-4b78-b9bb-046c52b570d7"
 	  }
+	  
 	]
 }

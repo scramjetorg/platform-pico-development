@@ -1,3 +1,4 @@
 build/
 
 *.wav
+/milestones/VDM/2.3/sth-cloud/sequences/audio-training-seq
