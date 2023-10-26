@@ -10,6 +10,7 @@ from statistics import mean
 STH_INSTANCE_INPUT_URL = "http://127.0.0.1:8000/api/v1/instance/6dd0e6aa-94da-420f-a67f-6df2a6706912/input"
 STH_INSTANCE_OUTPUT_URL = "http://127.0.0.1:8000/api/v1/instance/6dd0e6aa-94da-420f-a67f-6df2a6706912/output"
 SEND_DELAY_S = 1
+TEST_DURATION = 2 * 60 * 60
 
 keep_working = asyncio.Event()
 round_trips = []
@@ -58,7 +59,7 @@ def count_chunk_roundtrip(id, receive_time, send_id_time: dict, results_stream: 
 
 
 async def watchdog(session, results_stream):
-    await asyncio.sleep(3)
+    await asyncio.sleep(TEST_DURATION)
     keep_working.set()                                 
     await session.close()
     results_stream.end()
