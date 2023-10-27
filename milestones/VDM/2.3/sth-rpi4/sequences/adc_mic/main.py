@@ -11,7 +11,10 @@ import time
 import struct
 import random
 import pickle 
+import aiohttp
 
+
+import json
 from os import system
 from enum import Enum
 from scramjet.streams import Stream
@@ -29,7 +32,7 @@ BAUDRATE  = 115200
 #List of required MCUs names
 REQUIRED_MCU_NAMES = ['PicoMic#000', 'PicoLED#000']
 
-TEST_DURATION_IN_SEC = 30
+TEST_DURATION_IN_SEC = 10
 
 RECORDING_TIME = 3
 
@@ -38,6 +41,10 @@ FRAME_RATE = 8000
 TEMP_DIR = "/tmp/"
 
 NOISE_FILENAME_PATH = '/tmp/noise.wav'
+
+STH_INSTANCE_INPUT_URL = "http://192.168.0.5:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/input"
+
+STH_INSTANCE_OUTPUT_URL = "http://192.168.0.5:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/output"
 
 class ScramjetMCUProtocol:
 
@@ -109,46 +116,62 @@ class Peripherals:
 
 class DataProcessing:
 
-    async def read_adc(self, dev: dict, stop_event: asyncio.Event, saved_files: list):
+    async def get_data_over_http(self, url):
+        chunk = bytes()
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url) as resp:
+                    async for data, endOfChunk in resp.content.iter_chunks():
+                        chunk += data
+                        if endOfChunk:
+                            break
+            except Exception as e:
+                return ''                
+        return chunk
+                
+    async def read_adc(self, dev: dict, stop_event: asyncio.Event, captured_audio: asyncio.Queue):
         await Peripherals.turnMicOn(dev)
 
         while not stop_event.is_set():
-            filename = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8)) + ".wav"
-            inputFilePath = TEMP_DIR + filename
-            wavWrite = self.openAndSetInputFile(inputFilePath, 2 * FRAME_RATE)
-            await self.gatherAdcSamples(dev, FRAME_RATE * RECORDING_TIME, wavWrite)
-            wavWrite.close()
-            await saved_files.put(filename)
+            outputDataRAW = []
+            await self.gatherAdcSamples(dev, FRAME_RATE * RECORDING_TIME, outputDataRAW)
+            await captured_audio.put(outputDataRAW)
         await Peripherals.turnMicOff(dev)
 
-    async def only_send(self, stop_event: asyncio.Event, captured_files: list, stream: Stream):
+    async def _prepare_data(self, stop_event, captured_audio):
+        LIST_CHUNK_SIZE = 1024
+        while not stop_event.is_set():
+            audio_data = await captured_audio.get()
+
+            yield (json.dumps({"cmd": "1337"}) + '\n').encode(encoding="utf-8")
+            yield (json.dumps({"cmd": len(audio_data)}) + '\n').encode(encoding="utf-8")
+            
+            for i in range(0,len(audio_data),LIST_CHUNK_SIZE):
+                sub = audio_data[i:i+LIST_CHUNK_SIZE]
+                yield (json.dumps({"cmd": sub}) + '\n').encode(encoding="utf-8")
+            captured_audio.task_done()            
+            await asyncio.sleep(0)
+
+    async def only_send(self, stop_event: asyncio.Event, session: aiohttp.ClientSession, captured_audio: asyncio.Queue):        
+        async with session.post(STH_INSTANCE_INPUT_URL, data=self._prepare_data(stop_event, captured_audio), headers={'content-type': 'text/plain'}) as resp:
+            await resp.text()
+
+    
+    async def manage_led(self, dev: dict, stop_event: asyncio.Event, dp):
         while not stop_event.is_set():
             try:
-                captured_file = await asyncio.wait_for(captured_files.get(),2)
+                response = await asyncio.wait_for(dp.get_data_over_http(STH_INSTANCE_OUTPUT_URL),2)
             except asyncio.TimeoutError:
                 await asyncio.sleep(0)
                 continue
 
-            rate, data = wavfile.read(TEMP_DIR + captured_file)
-            #wavfile.write(outputFilename, rate, reduced_noise)
-            stream.write('1337')
-            serialized = pickle.dumps(data)
-            stream.write(len(serialized))
-            stream.write(serialized)
-            captured_files.task_done()
+            detected_words = response.decode().split('\n')[:-1]
+            print(f'Detected words: {detected_words}')
 
-    async def manage_led(self, dev: dict, stop_event: asyncio.Event, input: Stream):
-        while not stop_event.is_set():
-            try:
-                response = await asyncio.wait_for(input.read(),2)
-            except asyncio.TimeoutError:
-                await asyncio.sleep(0)
-                continue
-
-            if response == 'On':
+            if 'on' in detected_words:
                 await Peripherals.turnLedOn(dev)
 
-            if response == 'Off':
+            if 'off' in detected_words:
                 await Peripherals.turnLedOff(dev)
 
     def openAndSetInputFile(self, filePath: str, frameRate: int):
@@ -159,7 +182,7 @@ class DataProcessing:
         wavWrite.setcomptype('NONE', 'not compressed')
         return wavWrite
 
-    async def gatherAdcSamples(self, dev, framesCount: int, outputFile: wave.Wave_write): 
+    async def gatherAdcSamples(self, dev, framesCount: int, outputDataRAW: list): 
         no_frames = 0
         previousFrame = 0
         s = dev['reader']
@@ -179,13 +202,14 @@ class DataProcessing:
                 fakeFrame = int((previousFrame + frame)/2)
 
             except struct.error:
-                print('Wrong frame size, use previous again')
+                #print('Wrong frame size, use previous again')
                 frame = previousFrame
                 fakeFrame = frame
 
-            outputFile.writeframes(struct.pack("!h", fakeFrame))
+            outputDataRAW.append(fakeFrame)
             previousFrame = frame
-            outputFile.writeframes(data)
+            outputDataRAW.append(frame)
+
             no_frames += 1
             if (no_frames >= framesCount): break
 
@@ -272,11 +296,12 @@ class MCUManager:
             except asyncio.TimeoutError:
                 break
 
-async def _watchdog(manager, stream, duration):
+async def _watchdog(manager, stream, session, duration):
 
     manager.start_event.set()
     await asyncio.sleep(duration)
     manager.stop_event.set()
+    await session.close()
     stream.end()
 
 async def run(context, input, *args) -> Stream:
@@ -284,21 +309,22 @@ async def run(context, input, *args) -> Stream:
     stream = Stream()
     manager = MCUManager(REQUIRED_MCU_NAMES)
     dp = DataProcessing()
-    captured_files = asyncio.Queue()
+    captured_audio = asyncio.Queue()
     stop_event = asyncio.Event()
+    session = aiohttp.ClientSession()
 
     await manager.prepare_connections()
 
     for dev in manager.mcu:
 
         if dev['name'] == 'PicoMic#000':
-            asyncio.create_task(dp.read_adc(dev, stop_event, captured_files))
-            asyncio.create_task(dp.only_send(stop_event, captured_files, stream))
+            asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
+            asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
 
         if dev['name'] == 'PicoLed#000':
-            asyncio.create_task(dp.manage_led(dev, stop_event, input))
+            asyncio.create_task(dp.manage_led(dev, stop_event, dp))
     
-    asyncio.create_task(_watchdog(manager, stream, TEST_DURATION_IN_SEC))
+    asyncio.create_task(_watchdog(manager, stream, session, TEST_DURATION_IN_SEC))
     
     return stream
 
