@@ -32,7 +32,7 @@ BAUDRATE  = 115200
 #List of required MCUs names
 REQUIRED_MCU_NAMES = ['PicoMic#000', 'PicoLED#000']
 
-TEST_DURATION_IN_SEC = 10
+TEST_DURATION_IN_SEC = 60
 
 RECORDING_TIME = 3
 
@@ -42,9 +42,11 @@ TEMP_DIR = "/tmp/"
 
 NOISE_FILENAME_PATH = '/tmp/noise.wav'
 
-STH_INSTANCE_INPUT_URL = "http://192.168.0.5:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/input"
+HOST = "192.168.0.5"
 
-STH_INSTANCE_OUTPUT_URL = "http://192.168.0.5:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/output"
+STH_INSTANCE_INPUT_URL = f"http://{HOST}:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/input"
+
+STH_INSTANCE_OUTPUT_URL = f"http://{HOST}:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/output"
 
 class ScramjetMCUProtocol:
 
@@ -105,12 +107,12 @@ class Peripherals:
 
     @staticmethod
     async def turnLedOn(dev):
-        dev['writer'].write(struct.pack("!BHb", 6, 1, 3))
+        dev['writer'].write(struct.pack("!BHb", 6, 1, 2))
         await dev['writer'].drain()
 
     @staticmethod
     async def turnLedOff(dev):
-        dev['writer'].write(struct.pack("!BHb", 6, 1, 2))
+        dev['writer'].write(struct.pack("!BHb", 6, 1, 3))
         await dev['writer'].drain()
 
 
@@ -170,9 +172,13 @@ class DataProcessing:
 
             if 'on' in detected_words:
                 await Peripherals.turnLedOn(dev)
+                await asyncio.sleep(0.5)
+                print("LED is ON")
 
             if 'off' in detected_words:
                 await Peripherals.turnLedOff(dev)
+                await asyncio.sleep(0.5)
+                print("LED is OFF")     
 
     def openAndSetInputFile(self, filePath: str, frameRate: int):
         wavWrite = wave.open(filePath, "wb")
@@ -322,6 +328,10 @@ async def run(context, input, *args) -> Stream:
             asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
 
         if dev['name'] == 'PicoLed#000':
+            await Peripherals.turnLedOn(dev)
+            await asyncio.sleep(0.5)
+            print("LED is ON")
+
             asyncio.create_task(dp.manage_led(dev, stop_event, dp))
     
     asyncio.create_task(_watchdog(manager, stream, session, TEST_DURATION_IN_SEC))
