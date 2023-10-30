@@ -140,6 +140,19 @@ class DataProcessing:
             await captured_audio.put(outputDataRAW)
         await Peripherals.turnMicOff(dev)
 
+    async def read_fake_adc(self, dev: dict, stop_event: asyncio.Event, captured_audio: asyncio.Queue):
+        
+        import numpy as np
+        
+        wav_file = wave.open("/tmp/on2.wav", "rb")
+        data = wav_file.readframes(2 * FRAME_RATE * RECORDING_TIME)
+        wav_file.close()
+        
+        outputDataRAW = list(np.frombuffer(data,dtype=np.int16))
+        while not stop_event.is_set():
+            await asyncio.sleep(5)
+            await captured_audio.put(outputDataRAW)
+
     async def _prepare_data(self, stop_event, captured_audio):
         LIST_CHUNK_SIZE = 1024
         while not stop_event.is_set():
@@ -150,7 +163,7 @@ class DataProcessing:
             
             for i in range(0,len(audio_data),LIST_CHUNK_SIZE):
                 sub = audio_data[i:i+LIST_CHUNK_SIZE]
-                yield (json.dumps({"cmd": sub}) + '\n').encode(encoding="utf-8")
+                yield (json.dumps({"cmd": [int(x) for x in sub]}) + '\n').encode(encoding="utf-8")
             captured_audio.task_done()            
             await asyncio.sleep(0)
 
@@ -324,7 +337,9 @@ async def run(context, input, *args) -> Stream:
     for dev in manager.mcu:
 
         if dev['name'] == 'PicoMic#000':
-            asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
+            #asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
+            asyncio.create_task(dp.read_fake_adc(dev, stop_event, captured_audio))
+            
             asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
 
         if dev['name'] == 'PicoLed#000':
