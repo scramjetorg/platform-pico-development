@@ -32,9 +32,9 @@ BAUDRATE  = 115200
 #List of required MCUs names
 REQUIRED_MCU_NAMES = ['PicoMic#000', 'PicoLED#000']
 
-TEST_DURATION_IN_SEC = 60
+TEST_DURATION_IN_SEC = 900
 
-RECORDING_TIME = 3
+RECORDING_TIME = 1
 
 FRAME_RATE = 8000
 
@@ -140,24 +140,17 @@ class DataProcessing:
             await captured_audio.put(outputDataRAW)
         await Peripherals.turnMicOff(dev)
 
-    async def read_fake_adc(self, dev: dict, stop_event: asyncio.Event, captured_audio: asyncio.Queue):
-        
-        import numpy as np
-        
-        wav_file = wave.open("/tmp/on2.wav", "rb")
-        data = wav_file.readframes(2 * FRAME_RATE * RECORDING_TIME)
-        wav_file.close()
-        
-        outputDataRAW = list(np.frombuffer(data,dtype=np.int16))
-        while not stop_event.is_set():
-            await asyncio.sleep(5)
-            await captured_audio.put(outputDataRAW)
-
     async def _prepare_data(self, stop_event, captured_audio):
         LIST_CHUNK_SIZE = 1024
         while not stop_event.is_set():
             audio_data = await captured_audio.get()
 
+            # name = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            # fd = self.openAndSetInputFile(f'/tmp/dump_rpi4_{name}.wav',16000)
+            # for frame in audio_data:
+            #     fd.writeframes(struct.pack("!h", frame))
+            # fd.close()
+            
             yield (json.dumps({"cmd": "1337"}) + '\n').encode(encoding="utf-8")
             yield (json.dumps({"cmd": len(audio_data)}) + '\n').encode(encoding="utf-8")
             
@@ -337,8 +330,7 @@ async def run(context, input, *args) -> Stream:
     for dev in manager.mcu:
 
         if dev['name'] == 'PicoMic#000':
-            #asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
-            asyncio.create_task(dp.read_fake_adc(dev, stop_event, captured_audio))
+            asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
             
             asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
 
