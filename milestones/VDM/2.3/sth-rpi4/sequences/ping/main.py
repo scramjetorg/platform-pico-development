@@ -9,7 +9,7 @@ from statistics import mean
 
 HOST = "192.168.0.5"
 STH_INSTANCE_INPUT_URL = f"http://{HOST}:8000/api/v1/instance/6dd0e6aa-94da-420f-a67f-6df2a6706912/input"
-STH_INSTANCE_OUTPUT_URL = f"http://{HOST}/api/v1/instance/6dd0e6aa-94da-420f-a67f-6df2a6706912/output"
+STH_INSTANCE_OUTPUT_URL = f"http://{HOST}:8000/api/v1/instance/6dd0e6aa-94da-420f-a67f-6df2a6706912/output"
 SEND_DELAY_S = 1
 TEST_DURATION = 2 * 60 * 60
 
