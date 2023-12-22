@@ -1,7 +1,0 @@
-pyee
-tensorflow==2.13.0 
-tensorflow-io==0.33.0 
-numpy
-scipy
-noisereduce
-scramjet-framework-py

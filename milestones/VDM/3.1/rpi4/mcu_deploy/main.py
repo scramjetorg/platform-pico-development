@@ -16,10 +16,6 @@ from enum import Enum
 from scramjet.streams import Stream
 from serial_asyncio import open_serial_connection
 
-provides = {
-   'contentType': 'application/octet-stream'
-}
-
 # Regular expression to find MCU devices with UART
 DEVICE_REGEXP = '/dev/ttyAC?[0-9]*'
 
@@ -38,15 +34,9 @@ RECORDING_TIME = 1
 
 FRAME_RATE = 8000
 
-TEMP_DIR = "/tmp/"
+STH_INSTANCE_INPUT_URL = ""
 
-NOISE_FILENAME_PATH = '/tmp/noise.wav'
-
-HOST = "192.168.0.5"
-
-STH_INSTANCE_INPUT_URL = f"http://{HOST}:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/input"
-
-STH_INSTANCE_OUTPUT_URL = f"http://{HOST}:8000/api/v1/instance/2bf167a6-a9e4-4b78-b9bb-046c52b570d7/output"
+STH_INSTANCE_OUTPUT_URL = ""
 
 
 class ScramjetMCUProtocol:
@@ -341,36 +331,64 @@ def has_required_usb_devices(serials: [str]):
     devices = find_usb_devices_serials()
     for serial in serials:
         if not any(serial == device for device in devices):
+            print(f'Device id not found {serial}')
             return False
 
     return True
 
 
 def parse_context(context):
+    context = json.loads(json.dumps(context.config))
     serials = []
     devices = []
     elfs = []
     post_data_url = context["post_data_url"] or ""
     get_data_url = context["get_data_url"] or ""
+    elfs_folder = os.getcwd() + "/elfs/"
     for device in context["devices"]:
-        if device["name"] and device["id"] and device["probe"] and device["elf"]:
-            devices.append(device)
-            serials.append(device["id"])
+        if device["name"] and device["probe"] and device["elf"]:
             serials.append(device["probe"])
-            elfs.append(device["elf"])
+            elf_path = elfs_folder + device["elf"]
+            elfs.append(elf_path)
+            device["elf"] = elf_path
+            devices.append(device)
+            print(device)
 
     return serials, devices, elfs, post_data_url, get_data_url
 
 
 def has_required_elf_files(elfs: [str]):
     for elf in elfs:
-        if not os.path.isfile("elfs/" + elf):
+        if not os.path.isfile(elf):
+            print(f'Unable to find: {elf}')
             return False
+    return True
+
+
+def program_devices(devices):
+    for device in devices:
+
+        args = ['sudo', 'openocd', '-f', 'interface/cmsis-dap.cfg', '-f', 'target/rp2040.cfg',
+                '-c', f'adapter serial {device["probe"]}', '-c', 'adapter speed 5000',
+                '-c', f'program {device["elf"]} verify reset exit']
+
+        try:
+            df = subprocess.run(args, capture_output=True, text=True)
+            print(df.stdout)
+            print(df.stderr)
+            print(f'{os.path.basename(device["elf"])} successfully programmed on MCU with probe {device["probe"]}')
+
+        except subprocess.CalledProcessError as e:
+            print(f'Error: {e}')
     return True
 
 
 async def run(context, input, *args) -> Stream:
     serials, devices, elfs, post_data_url, get_data_url = parse_context(context)
+    global STH_INSTANCE_INPUT_URL
+    global STH_INSTANCE_OUTPUT_URL
+    STH_INSTANCE_INPUT_URL = post_data_url
+    STH_INSTANCE_OUTPUT_URL = get_data_url
 
     print(devices)
 
@@ -383,54 +401,58 @@ async def run(context, input, *args) -> Stream:
         return stream
 
     print("Required devices found")
+    program_devices(devices)
 
-    stream.end()
+    manager = MCUManager(REQUIRED_MCU_NAMES)
+    dp = DataProcessing()
+    captured_audio = asyncio.Queue()
+    stop_event = asyncio.Event()
+    session = aiohttp.ClientSession()
 
-    # manager = MCUManager(REQUIRED_MCU_NAMES)
-    # dp = DataProcessing()
-    # captured_audio = asyncio.Queue()
-    # stop_event = asyncio.Event()
-    # session = aiohttp.ClientSession()
-    #
-    # await manager.prepare_connections()
-    #
-    # for dev in manager.mcu:
-    #
-    #     if dev['name'] == 'PicoMic#000':
-    #         asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
-    #
-    #         asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
-    #
-    #     if dev['name'] == 'PicoLed#000':
-    #         await Peripherals.turnLedOn(dev)
-    #         await asyncio.sleep(0.5)
-    #         print("LED is ON")
-    #
-    #         asyncio.create_task(dp.manage_led(dev, stop_event, dp))
-    #
-    # asyncio.create_task(_watchdog(manager, stream, session, TEST_DURATION_IN_SEC))
+    await manager.prepare_connections()
+
+    for dev in manager.mcu:
+
+        if dev['name'] == 'PicoMic#000':
+            asyncio.create_task(dp.read_adc(dev, stop_event, captured_audio))
+
+            asyncio.create_task(dp.only_send(stop_event, session, captured_audio))
+
+        if dev['name'] == 'PicoLed#000':
+            await Peripherals.turnLedOn(dev)
+            await asyncio.sleep(0.5)
+            print("LED is ON")
+
+            asyncio.create_task(dp.manage_led(dev, stop_event, dp))
+
+    asyncio.create_task(_watchdog(manager, stream, session, TEST_DURATION_IN_SEC))
     
     return stream
 
 
-test_context = {
-    "devices": [
-        {
-            "name": "PicoLED",
-            "id": "E6614103E7637A21",
-            "probe": "E6616407E3515229",
-            "elf": "zephyr_led.elf"
-        },
-        {
-            "name": "PicoMic",
-            "id": "E661AC8863887525",
-            "probe": "E6616407E3542629",
-            "elf": "zephyr_mic.elf"
-        }
-    ],
-    "post_data_url": "some_fake_url",
-    "get_data_url": "some_fake_url"
-}
+class Context:
+    def __init__(self):
+        self.config = {
+            "devices": [
+                {
+                    "name": "PicoMic",  # 1
+                    "probe": "E6616407E3515229",
+                    "elf": "zephyr_mic.elf"
+                    # "elf": "zephyr_blinky.elf"
+                },
+                {
+                    "name": "PicoLED",  # 2
+                    "probe": "E6616407E3542629",
+                    "elf": "zephyr_led.elf"
+                    # "elf": "zephyr_blinky.elf"
+                }
+            ],
+            "post_data_url": "some_fake_url",
+            "get_data_url": "some_fake_url"
+            }
+
+
+test_context = Context()
 
 
 async def run_without_sth():
