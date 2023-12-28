@@ -376,10 +376,14 @@ def program_devices(devices):
             df = subprocess.run(args, capture_output=True, text=True)
             print(df.stdout)
             print(df.stderr)
+            df.check_returncode()
             print(f'{os.path.basename(device["elf"])} successfully programmed on MCU with probe {device["probe"]}')
 
         except subprocess.CalledProcessError as e:
+            print(f'{os.path.basename(device["elf"])} failed programing on MCU with probe {device["probe"]}')
             print(f'Error: {e}')
+            return False
+        time.sleep(1)
     return True
 
 
@@ -401,7 +405,10 @@ async def run(context, input, *args) -> Stream:
         return stream
 
     print("Required devices found")
-    program_devices(devices)
+    if not program_devices(devices):
+        print("Failed programming devices")
+        stream.end()
+        return stream
 
     manager = MCUManager(REQUIRED_MCU_NAMES)
     dp = DataProcessing()
